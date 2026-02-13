@@ -12,3 +12,10 @@ dependencies = [
     "pyyaml",
     "rich>=14.3.2",
 ]
+
+[project.scripts]
+mvh = "mvh.main:main"
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
