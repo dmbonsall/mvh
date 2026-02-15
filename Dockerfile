@@ -2,7 +2,7 @@ FROM ghcr.io/astral-sh/uv:0.10-python3.14-alpine as base
 
 RUN apk add docker-cli docker-cli-compose git
 
-ENV UV_COMPILE_BYTECODE=1 UV_NO_DEV=1
+ENV UV_COMPILE_BYTECODE=1 UV_NO_DEV=1 UV_LINK_MODE=copy
 
 # Change the working directory to the `app` directory
 WORKDIR /app

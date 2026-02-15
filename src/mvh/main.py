@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import subprocess
@@ -14,8 +15,8 @@ _logger = logging.getLogger(__name__)
 
 
 class AppSettings(BaseSettings):
-    repo_remote_url: str = "/Users/david/projects/docker-compose"
-    default_branch: str = "master"
+    remote_url: str = "/Users/david/projects/docker-compose"
+    branch: str = "master"
     hostname: str = "aquarius"
 
 
@@ -40,9 +41,6 @@ class DockerComposeLogLine(BaseModel):
             _logger.info("%s %s", self.id, self.status)
 
 
-settings = AppSettings()
-
-
 def git(*args):
     subprocess.run(["git", *args], capture_output=True)
 
@@ -60,30 +58,30 @@ def docker_compose(*args):
     assert proc.returncode == 0
 
 
-def setup_git_repo(local_repo: Path):
+def setup_git_repo(local_repo: Path, remote_url: str, branch: str):
     _logger.info("Setting up git repo")
     if not (local_repo / ".git").is_dir():
-        _logger.info("Cloning repo %s", settings.repo_remote_url)
-        git("clone", settings.repo_remote_url, local_repo)
+        _logger.info("Cloning repo %s", remote_url)
+        git("clone", remote_url, local_repo)
     assert (local_repo / ".git").is_dir(), "not a git repo"
 
     os.chdir(local_repo)
-    git("checkout", settings.default_branch)
-    git("pull", "origin", settings.default_branch)
+    git("checkout", branch)
+    git("pull", "origin", branch)
     _logger.info("Updated git repo to latest version")
 
 
-def deploy_stacks(local_repo: Path, repo_config: RepoConfig):
-    for stack in repo_config.hosts[settings.hostname].stacks:
+def deploy_stacks(local_repo: Path, host_config: HostConfig):
+    for stack in host_config.stacks:
         _logger.info("Processing stack %s", stack)
         assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
         os.chdir(local_repo / stack)
         docker_compose("up", "--detach")
 
 
-def main():
+def deploy(settings: AppSettings):
     local_repo = Path(tempfile.gettempdir()) / "mvh"
-    setup_git_repo(local_repo)
+    setup_git_repo(local_repo, settings.remote_url, settings.branch)
 
     assert (local_repo / "mvh-config.yaml").is_file(), "missing mvh-config.yaml"
     with (local_repo / "mvh-config.yaml").open(encoding="utf-8") as f:
@@ -93,7 +91,30 @@ def main():
         _logger.warning("Host not found in repo config, nothing to do")
         return
 
-    deploy_stacks(local_repo, repo_config)
+    deploy_stacks(local_repo, repo_config.hosts[settings.hostname])
+
+
+def build_settings_override(args: argparse.Namespace):
+    overrides: dict[str, str] = {}
+    for k in AppSettings.model_fields:
+        if (v := getattr(args, k, None)) is not None:
+            overrides[k] = v
+    return overrides
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--remote-url", default=None, type=str)
+    parser.add_argument("--branch", default=None, type=str)
+    parser.add_argument("--hostname", default=None, type=str)
+    subparsers = parser.add_subparsers(required=True)
+    deploy_parser = subparsers.add_parser("deploy")
+    deploy_parser.set_defaults(func=deploy)
+
+    args = parser.parse_args()
+    overrides = build_settings_override(args)
+    settings = AppSettings(**overrides)
+    args.func(settings)
 
 
 if __name__ == "__main__":
