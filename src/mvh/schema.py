@@ -15,6 +15,12 @@ def generate_webhook_id() -> str:
     return "".join(random.choices(WEBHOOK_CHARS, k=64))
 
 
+def validate_webhook_ids(val: list[str]) -> list[str]:
+    for val in val:
+        validate_webhook_id(val)
+    return val
+
+
 def validate_webhook_id(val: str) -> str:
     if not all(c in WEBHOOK_CHARS for c in val):
         raise ValueError(f"Invalid webhook id {val}")
@@ -26,7 +32,7 @@ class AppSettings(BaseSettings):
     branch: str = "master"
     hostname: str = "aquarius"
     webhook_ids: Annotated[
-        list[str], AfterValidator(validate_webhook_id), Field(default_factory=list)
+        list[str], AfterValidator(validate_webhook_ids), Field(default_factory=list)
     ]
 
 
