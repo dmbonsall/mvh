@@ -21,3 +21,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
 ENTRYPOINT ["uv", "run", "--no-sync", "mvh"]
+CMD ["api"]
