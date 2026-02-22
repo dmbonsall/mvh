@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "black>=26.1.0",
     "fastapi>=0.129.0",
     "mypy>=1.19.1",
     "pydantic>=2.12.5",
@@ -21,3 +20,9 @@ mvh = "mvh.main:main"
 [build-system]
 requires = ["uv_build>=0.10.2,<0.11.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "black>=26.1.0",
+]

@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -28,6 +29,38 @@ def docker_compose(*args):
     assert proc.returncode == 0
 
 
+def duplicate_self(settings: AppSettings):
+    r = subprocess.run(
+        ["docker", "ps", "--format", "{{ .ID}} {{ .Image}}"], capture_output=True
+    )
+    assert r.returncode == 0
+    image = None
+    for line in r.stdout.decode("utf-8").splitlines():
+        if line.startswith(socket.gethostname()):
+            image = line.split(" ", 1)[1]
+            break
+    assert image is not None
+
+    args = [
+        "docker",
+        "run",
+        "--detach",
+        "--env",
+        f"REMOTE_URL={settings.remote_url}",
+        "--env",
+        f"BRANCH={settings.branch}",
+        "--env",
+        f"HOSTNAME={settings.hostname}",
+        "--volume",
+        "/var/run/docker.sock:/var/run/docker.sock",
+        image,
+        "bootstrap",
+    ]
+    _logger.info("Duplicating stack %s", args)
+    r = subprocess.run(args, capture_output=True)
+    assert r.returncode == 0
+
+
 def setup_git_repo(local_repo: Path, remote_url: str, branch: str):
     _logger.info("Setting up git repo")
     if not (local_repo / ".git").is_dir():
@@ -41,15 +74,31 @@ def setup_git_repo(local_repo: Path, remote_url: str, branch: str):
     _logger.info("Updated git repo to latest version")
 
 
-def deploy_stacks(local_repo: Path, host_config: HostConfig):
+def _deploy_all_stacks_for_host(
+    local_repo: Path,
+    host_config: HostConfig,
+    settings: AppSettings,
+):
+    should_bootstrap = False
     for stack in host_config.stacks:
-        _logger.info("Processing stack %s", stack)
-        assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
-        os.chdir(local_repo / stack)
-        docker_compose("up", "--detach")
+        if stack == host_config.mvh_stack:
+            should_bootstrap = True
+            continue
+
+        _deploy_single_stack(local_repo, stack)
+
+    if should_bootstrap:
+        duplicate_self(settings)
 
 
-def deploy(settings: AppSettings):
+def _deploy_single_stack(local_repo: Path, stack: str):
+    _logger.info("Processing stack %s", stack)
+    assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
+    os.chdir(local_repo / stack)
+    docker_compose("up", "--detach")
+
+
+def _prepare_repo(settings: AppSettings) -> tuple[Path, RepoConfig]:
     local_repo = Path(tempfile.gettempdir()) / "mvh"
     setup_git_repo(local_repo, settings.remote_url, settings.branch)
 
@@ -59,6 +108,19 @@ def deploy(settings: AppSettings):
 
     if settings.hostname not in repo_config.hosts:
         _logger.warning("Host not found in repo config, nothing to do")
-        return
+        raise ValueError("TODO missing hostname")
+    return local_repo, repo_config
 
-    deploy_stacks(local_repo, repo_config.hosts[settings.hostname])
+
+def deploy(settings: AppSettings):
+    local_repo, repo_config = _prepare_repo(settings)
+    _deploy_all_stacks_for_host(
+        local_repo,
+        repo_config.hosts[settings.hostname],
+        settings,
+    )
+
+
+def bootstrap(settings: AppSettings):
+    local_repo, repo_config = _prepare_repo(settings)
+    _deploy_single_stack(local_repo, repo_config.hosts[settings.hostname].mvh_stack)

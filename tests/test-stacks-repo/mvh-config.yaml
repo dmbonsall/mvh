@@ -1,0 +1,5 @@
+hosts:
+  pytest:
+    stacks:
+      - mvh
+    mvh-stack: mvh

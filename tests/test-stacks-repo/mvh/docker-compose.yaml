@@ -1,0 +1,15 @@
+services:
+  mvh:
+    image: mvh-test:latest
+    restart: unless-stopped
+    environment:
+      REMOTE_URL: file:///test-stacks-repo
+      BRANCH: main
+      HOSTNAME: pytest
+      WEBHOOK_IDS: '["abc123"]'
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

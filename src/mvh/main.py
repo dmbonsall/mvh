@@ -5,7 +5,7 @@ import uvicorn
 from rich.logging import RichHandler
 
 from mvh.api import webhook_app, set_settings
-from mvh.deploy import deploy
+from mvh.deploy import deploy, bootstrap
 from mvh.schema import (
     AppSettings,
     generate_webhook_id,
@@ -41,6 +41,9 @@ def main():
 
     deploy_parser = subparsers.add_parser("deploy")
     deploy_parser.set_defaults(func=deploy)
+
+    bootstrap_parser = subparsers.add_parser("bootstrap")
+    bootstrap_parser.set_defaults(func=bootstrap)
 
     new_webhook_parser = subparsers.add_parser("new-webhook")
     new_webhook_parser.set_defaults(func=new_webhook)

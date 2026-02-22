@@ -38,6 +38,7 @@ class AppSettings(BaseSettings):
 
 class HostConfig(BaseModel):
     stacks: list[str]
+    mvh_stack: str = "mvh"
 
 
 class RepoConfig(BaseModel):
