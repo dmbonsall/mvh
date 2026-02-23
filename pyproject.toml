@@ -25,4 +25,6 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.0.2",
     "black>=26.1.0",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
 ]

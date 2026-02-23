@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.10-python3.14-alpine as base
+FROM ghcr.io/astral-sh/uv:0.10-python3.14-alpine AS base
 
 RUN apk add docker-cli docker-cli-compose git
 

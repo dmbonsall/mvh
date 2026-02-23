@@ -1,14 +1,19 @@
 import contextlib
+import json
 import os
 import shutil
 import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
+import requests
+import yaml
 
 
 @contextlib.contextmanager
-def cd(path: str):
+def cd(path: str | Path):
     old_dir = os.getcwd()
     os.chdir(path)
     try:
@@ -28,10 +33,15 @@ def docker_build(docker):
 
 
 @pytest.fixture(autouse=True, scope="session")
-def stacks_repo() -> Path:
-    if Path("/tmp/mvh-test/test-stacks-repo").exists():
-        shutil.rmtree("/tmp/mvh-test/test-stacks-repo")
-    Path("/tmp/mvh-test").mkdir(parents=True, exist_ok=True)
+def _stacks_repo() -> Path:
+    if Path("/tmp/mvh-test").exists():
+        shutil.rmtree("/tmp/mvh-test")
+    Path("/tmp/mvh-test").mkdir(parents=True)
+    Path("/tmp/mvh-test/test-stacks-repo.git").mkdir(parents=True)
+    with cd("/tmp/mvh-test/test-stacks-repo.git"):
+        subprocess.check_call(["git", "init", "--bare"])
+        shutil.move("hooks/post-update.sample", "hooks/post-update")
+
     shutil.copytree(
         Path(__file__).parent / "test-stacks-repo",
         Path("/tmp/mvh-test/test-stacks-repo"),
@@ -41,8 +51,40 @@ def stacks_repo() -> Path:
         subprocess.check_call(["git", "branch", "-M", "main"])
         subprocess.check_call(["git", "add", "--all"])
         subprocess.check_call(["git", "commit", "-m", "Initial commit"])
+        subprocess.check_call(
+            ["git", "remote", "add", "origin", "/tmp/mvh-test/test-stacks-repo.git"]
+        )
+        subprocess.check_call(["git", "push", "-u", "origin", "main"])
+        # shutil.move(".git/hooks/post-update.sample", ".git/hooks/post-update")
+        subprocess.check_call(["git", "branch", "test"])
+        subprocess.check_call(["git", "push", "-u", "origin", "test"])
 
-    return Path("/tmp/mvh-test/test-stacks-repo")
+    server_proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "http.server",
+            "-d",
+            "/tmp/mvh-test",
+            "-b",
+            "127.0.0.1",
+            "8001",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    yield Path("/tmp/mvh-test/test-stacks-repo")
+    server_proc.terminate()
+
+
+@pytest.fixture(autouse=True)
+def stacks_repo(_stacks_repo) -> Path:
+    with cd(_stacks_repo):
+        subprocess.check_call(["git", "checkout", "test"])
+        subprocess.check_call(["git", "reset", "--hard", "main"])
+        subprocess.check_call(["git", "push", "origin", "test", "--force"])
+
+    return _stacks_repo
 
 
 def mvh_stack_running() -> bool:
@@ -51,8 +93,21 @@ def mvh_stack_running() -> bool:
         capture_output=True,
     )
     assert result.returncode == 0
-    lines = result.stdout.decode("utf-8").strip().split("\n")
+    lines = [l for l in result.stdout.decode("utf-8").strip().split("\n") if l]
     return len(lines) == 1
+
+
+def mvh_labels() -> dict[str, str]:
+    result = subprocess.run(
+        ["docker", "ps", "--filter=name=mvh-mvh-1", "--format=json"],
+        capture_output=True,
+    )
+    assert result.returncode == 0
+    lines = result.stdout.decode("utf-8").strip().split("\n")
+    assert len(lines) == 1
+    data = json.loads(lines[0])
+    tokens = data["Labels"].split(",")
+    return {(kv := t.split("="))[0]: (kv[1] if len(kv) > 1 else None) for t in tokens}
 
 
 @pytest.fixture(autouse=True)
@@ -69,12 +124,30 @@ def test_bootstrap(stacks_repo):
             "run",
             "--rm",
             "--volume=/var/run/docker.sock:/var/run/docker.sock",
-            "--volume=/tmp/mvh-test/test-stacks-repo:/test-stacks-repo",
-            "--env=REMOTE_URL=file:///test-stacks-repo",
-            "--env=BRANCH=main",
+            "--env=REMOTE_URL=http://host.docker.internal:8001/test-stacks-repo.git",
+            "--env=BRANCH=test",
             "--env=HOSTNAME=pytest",
             "mvh-test:latest",
             "bootstrap",
         ]
     )
     assert mvh_stack_running()
+
+
+def test_webhook_with_bootstrap(stacks_repo):
+    with cd(stacks_repo / "mvh"):
+        subprocess.check_call(["docker", "compose", "up", "-d"])
+        time.sleep(1)  # wait for mvh to start serving
+        with open("docker-compose.yaml", "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        data["services"]["mvh"]["labels"] = {"test.extra": "EXTRA"}
+        with open("docker-compose.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+        subprocess.check_call(["git", "commit", "-am", "Update labels"])
+        subprocess.check_call(["git", "push", "origin", "test"])
+
+    res = requests.get("http://localhost:8000/webhook/abc123", timeout=5)
+    time.sleep(5)  # wait for the restart
+    assert res.status_code == 200
+    assert mvh_stack_running()
+    assert mvh_labels()["test.extra"] == "EXTRA"

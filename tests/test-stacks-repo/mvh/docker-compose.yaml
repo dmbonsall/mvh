@@ -3,8 +3,8 @@ services:
     image: mvh-test:latest
     restart: unless-stopped
     environment:
-      REMOTE_URL: file:///test-stacks-repo
-      BRANCH: main
+      REMOTE_URL: http://host.docker.internal:8001/test-stacks-repo.git
+      BRANCH: test
       HOSTNAME: pytest
       WEBHOOK_IDS: '["abc123"]'
     expose:
