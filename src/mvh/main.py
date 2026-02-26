@@ -1,10 +1,12 @@
 import argparse
+import functools
 import logging
 import sys
+from typing import Callable
 
 import uvicorn
 from pydantic import ValidationError
-from rich.logging import RichHandler
+from rich.console import Console
 
 from mvh.api import webhook_app, set_settings
 from mvh.deploy import deploy, bootstrap
@@ -13,12 +15,17 @@ from mvh.schema import (
     generate_webhook_id,
 )
 
-logging.basicConfig(format="%(message)s", level=logging.DEBUG, handlers=[RichHandler()])
-_logger = logging.getLogger(__name__)
+# Console is really just intended for immediate feedback from the CLI, use logging
+# otherwise.
+console = Console()
+
+logging.basicConfig(
+    format="%(asctime)s %(name)-12s %(levelname)-8s %(message)s", level=logging.DEBUG
+)
 
 
 def new_webhook(_settings: AppSettings):
-    print(generate_webhook_id())
+    console.print(generate_webhook_id(), style="cyan")
 
 
 def build_settings_override(args: argparse.Namespace):
@@ -32,6 +39,30 @@ def build_settings_override(args: argparse.Namespace):
 def run_api(settings: AppSettings):
     set_settings(settings)
     uvicorn.run(webhook_app, host="0.0.0.0", port=8000, log_config=None)
+
+
+def requires_settings(
+    func: Callable[[AppSettings], int | None],
+) -> Callable[[argparse.Namespace], int]:
+    @functools.wraps(func)
+    def wrapper(args: argparse.Namespace) -> int:
+        overrides = build_settings_override(args)
+
+        try:
+            settings = AppSettings(**overrides)
+        except ValidationError as ex:
+            for error in ex.errors():
+                if error["type"] == "missing":
+                    console.print(
+                        "Field required:", ".".join(error["loc"]), style="bold red"
+                    )
+                else:
+                    raise
+
+            return 64
+        return func(settings) or 0
+
+    return wrapper
 
 
 def main():
@@ -57,37 +88,23 @@ def main():
     subparsers = parser.add_subparsers(required=True)
 
     deploy_parser = subparsers.add_parser("deploy")
-    deploy_parser.set_defaults(func=deploy)
+    deploy_parser.set_defaults(func=requires_settings(deploy))
 
     bootstrap_parser = subparsers.add_parser("bootstrap")
-    bootstrap_parser.set_defaults(func=bootstrap)
+    bootstrap_parser.set_defaults(func=requires_settings(bootstrap))
+
+    api_parser = subparsers.add_parser("api")
+    api_parser.set_defaults(func=requires_settings(run_api))
 
     new_webhook_parser = subparsers.add_parser("new-webhook")
     new_webhook_parser.set_defaults(func=new_webhook)
 
-    api_parser = subparsers.add_parser("api")
-    api_parser.set_defaults(func=run_api)
-
     args = parser.parse_args()
-    overrides = build_settings_override(args)
 
-    try:
-        settings = AppSettings(**overrides)
-    except ValidationError as ex:
-        should_raise = False
-        for error in ex.errors():
-            if error["type"] == "missing":
-                _logger.error("Field required: %s", ".".join(error["loc"]))
-            else:
-                should_raise = True
-
-        if should_raise:
-            raise
+    rc = args.func(args)
+    if rc == 64:
         parser.print_help()
-        return 1
-
-    args.func(settings)
-    return 0
+    return rc
 
 
 if __name__ == "__main__":
