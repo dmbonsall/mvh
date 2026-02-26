@@ -146,7 +146,7 @@ def test_webhook_with_bootstrap(stacks_repo):
         subprocess.check_call(["git", "commit", "-am", "Update labels"])
         subprocess.check_call(["git", "push", "origin", "test"])
 
-    res = requests.get("http://localhost:8000/webhook/abc123", timeout=5)
+    res = requests.post("http://localhost:8000/webhook/abc123", timeout=5)
     time.sleep(5)  # wait for the restart
     assert res.status_code == 200
     assert mvh_stack_running()

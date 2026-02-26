@@ -26,7 +26,7 @@ async def root():
     return {"status": "ok"}
 
 
-@webhook_app.get("/webhook/{webhook_id}")
+@webhook_app.post("/webhook/{webhook_id}")
 async def webhook(webhook_id: str, settings: AppSettings = Depends(get_settings)):
     if webhook_id not in settings.webhook_ids:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
