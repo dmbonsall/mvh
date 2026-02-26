@@ -21,19 +21,15 @@ def git(*args):
 
 def docker_compose(*args):
     proc = subprocess.Popen(
-        ["docker", "compose", "--ansi=never", "--progress=json", *args],
+        ["docker", "compose", "--ansi=never", "--progress=plain", *args],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
     for line in proc.stdout:
-        DockerComposeLogLine.model_validate_json(line).log()
+        _logger.info("Compose:: %s", line.decode("utf-8"))
 
     proc.poll()
-    if proc.returncode:
-        _logger.error("Docker compose returned non-zero exit code: %s", proc.returncode)
-        for line in proc.stderr:
-            print(line.decode("utf-8"))
-        raise ValueError("Docker compose returned non-zero exit code")
+    assert proc.returncode == 0
 
 
 def duplicate_self(settings: AppSettings):
@@ -102,7 +98,7 @@ def _deploy_single_stack(local_repo: Path, stack: str):
     _logger.info("Processing stack %s", stack)
     assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
     os.chdir(local_repo / stack)
-    docker_compose("up", "--detach", "--force-recreate", "--pull", "always")
+    docker_compose("up", "--detach", "--force-recreate")
 
 
 def _prepare_repo(settings: AppSettings) -> tuple[Path, RepoConfig]:

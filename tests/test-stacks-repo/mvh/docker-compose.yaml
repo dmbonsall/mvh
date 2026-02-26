@@ -2,6 +2,7 @@ services:
   mvh:
     image: mvh-test:latest
     restart: unless-stopped
+    pull_policy: never
     environment:
       MVH_REMOTE_URL: http://host.docker.internal:8001/test-stacks-repo.git
       MVH_BRANCH: test

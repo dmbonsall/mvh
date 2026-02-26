@@ -52,6 +52,7 @@ class DockerComposeLogLine(BaseModel):
     msg: str | None = None
     id: str | None = None
     status: str | None = None
+    text: str | None = None
 
     def log(self):
         if self.level and self.msg:
@@ -60,3 +61,5 @@ class DockerComposeLogLine(BaseModel):
             )
         elif self.id and self.status:
             _docker_logger.info("%s %s", self.id, self.status)
+        else:
+            _docker_logger.info("%s %s", self.id, self.text)
