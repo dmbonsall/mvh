@@ -97,7 +97,7 @@ def _deploy_single_stack(local_repo: Path, stack: str):
     _logger.info("Processing stack %s", stack)
     assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
     os.chdir(local_repo / stack)
-    docker_compose("up", "--detach", "--force-recreate")
+    docker_compose("up", "--detach", "--force-recreate", "--pull", "always")
 
 
 def _prepare_repo(settings: AppSettings) -> tuple[Path, RepoConfig]:
