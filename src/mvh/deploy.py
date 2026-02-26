@@ -2,6 +2,7 @@ import logging
 import os
 import socket
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -28,7 +29,11 @@ def docker_compose(*args):
         DockerComposeLogLine.model_validate_json(line).log()
 
     proc.poll()
-    assert proc.returncode == 0
+    if proc.returncode:
+        _logger.error("Docker compose returned non-zero exit code: %s", proc.returncode)
+        for line in proc.stderr:
+            print(line.decode("utf-8"))
+        raise ValueError("Docker compose returned non-zero exit code")
 
 
 def duplicate_self(settings: AppSettings):
