@@ -124,9 +124,9 @@ def test_bootstrap(stacks_repo):
             "run",
             "--rm",
             "--volume=/var/run/docker.sock:/var/run/docker.sock",
-            "--env=REMOTE_URL=http://host.docker.internal:8001/test-stacks-repo.git",
-            "--env=BRANCH=test",
-            "--env=HOSTNAME=pytest",
+            "--env=MVH_REMOTE_URL=http://host.docker.internal:8001/test-stacks-repo.git",
+            "--env=MVH_BRANCH=test",
+            "--env=MVH_NODE=pytest",
             "mvh-test:latest",
             "bootstrap",
         ]

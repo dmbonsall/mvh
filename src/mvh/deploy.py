@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from mvh.schema import DockerComposeLogLine, HostConfig, AppSettings, RepoConfig
+from mvh.schema import DockerComposeLogLine, NodeConfig, AppSettings, RepoConfig
 
 _logger = logging.getLogger(__name__)
 
@@ -48,11 +48,11 @@ def duplicate_self(settings: AppSettings):
         "run",
         "--detach",
         "--env",
-        f"REMOTE_URL={settings.remote_url}",
+        f"MVH_REMOTE_URL={settings.remote_url}",
         "--env",
-        f"BRANCH={settings.branch}",
+        f"MVH_BRANCH={settings.branch}",
         "--env",
-        f"HOSTNAME={settings.hostname}",
+        f"MVH_NODE={settings.node}",
         "--volume",
         "/var/run/docker.sock:/var/run/docker.sock",
         image,
@@ -78,7 +78,7 @@ def setup_git_repo(local_repo: Path, remote_url: str, branch: str):
 
 def _deploy_all_stacks_for_host(
     local_repo: Path,
-    host_config: HostConfig,
+    host_config: NodeConfig,
     settings: AppSettings,
 ):
     should_bootstrap = False
@@ -109,9 +109,9 @@ def _prepare_repo(settings: AppSettings) -> tuple[Path, RepoConfig]:
     with (local_repo / "mvh-config.yaml").open(encoding="utf-8") as f:
         repo_config = RepoConfig.model_validate(yaml.safe_load(f))
 
-    if settings.hostname not in repo_config.hosts:
-        _logger.warning("Host not found in repo config, nothing to do")
-        raise ValueError("TODO missing hostname")
+    if settings.node not in repo_config.nodes:
+        _logger.warning("Node not found in repo config, nothing to do")
+        raise ValueError(f"Node not found in repo config: {settings.node}")
     return local_repo, repo_config
 
 
@@ -119,11 +119,11 @@ def deploy(settings: AppSettings):
     local_repo, repo_config = _prepare_repo(settings)
     _deploy_all_stacks_for_host(
         local_repo,
-        repo_config.hosts[settings.hostname],
+        repo_config.nodes[settings.node],
         settings,
     )
 
 
 def bootstrap(settings: AppSettings):
     local_repo, repo_config = _prepare_repo(settings)
-    _deploy_single_stack(local_repo, repo_config.hosts[settings.hostname].mvh_stack)
+    _deploy_single_stack(local_repo, repo_config.nodes[settings.node].mvh_stack)

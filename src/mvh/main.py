@@ -1,7 +1,9 @@
 import argparse
 import logging
+import sys
 
 import uvicorn
+from pydantic import ValidationError
 from rich.logging import RichHandler
 
 from mvh.api import webhook_app, set_settings
@@ -34,9 +36,24 @@ def run_api(settings: AppSettings):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--remote-url", default=None, type=str)
-    parser.add_argument("--branch", default=None, type=str)
-    parser.add_argument("--hostname", default=None, type=str)
+    parser.add_argument(
+        "--remote-url",
+        default=None,
+        type=str,
+        help="URL of git remote git repository (env: MVH_REMOTE_URL)",
+    )
+    parser.add_argument(
+        "--branch",
+        default=None,
+        type=str,
+        help="Name of git branch to use (default: 'main') (env: MVH_BRANCH)",
+    )
+    parser.add_argument(
+        "--node",
+        default=None,
+        type=str,
+        help="Name of the node to deploy for (env: MVH_NODE)",
+    )
     subparsers = parser.add_subparsers(required=True)
 
     deploy_parser = subparsers.add_parser("deploy")
@@ -53,9 +70,25 @@ def main():
 
     args = parser.parse_args()
     overrides = build_settings_override(args)
-    settings = AppSettings(**overrides)
+
+    try:
+        settings = AppSettings(**overrides)
+    except ValidationError as ex:
+        should_raise = False
+        for error in ex.errors():
+            if error["type"] == "missing":
+                _logger.error("Field required: %s", ".".join(error["loc"]))
+            else:
+                should_raise = True
+
+        if should_raise:
+            raise
+        parser.print_help()
+        return 1
+
     args.func(settings)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

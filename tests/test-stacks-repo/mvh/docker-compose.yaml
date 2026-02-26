@@ -3,10 +3,10 @@ services:
     image: mvh-test:latest
     restart: unless-stopped
     environment:
-      REMOTE_URL: http://host.docker.internal:8001/test-stacks-repo.git
-      BRANCH: test
-      HOSTNAME: pytest
-      WEBHOOK_IDS: '["abc123"]'
+      MVH_REMOTE_URL: http://host.docker.internal:8001/test-stacks-repo.git
+      MVH_BRANCH: test
+      MVH_NODE: pytest
+      MVH_WEBHOOK_IDS: '["abc123"]'
     expose:
       - "8000"
     ports:

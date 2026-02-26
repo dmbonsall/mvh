@@ -4,7 +4,7 @@ import string
 from typing import Annotated
 
 from pydantic import BaseModel, AfterValidator, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _docker_logger = logging.getLogger("docker-compose")
 
@@ -28,21 +28,23 @@ def validate_webhook_id(val: str) -> str:
 
 
 class AppSettings(BaseSettings):
-    remote_url: str = "/Users/david/projects/docker-compose"
-    branch: str = "master"
-    hostname: str = "aquarius"
+    model_config = SettingsConfigDict(env_prefix="mvh_")
+
+    remote_url: str
+    branch: str = "main"
+    node: str
     webhook_ids: Annotated[
         list[str], AfterValidator(validate_webhook_ids), Field(default_factory=list)
     ]
 
 
-class HostConfig(BaseModel):
+class NodeConfig(BaseModel):
     stacks: list[str]
     mvh_stack: str = "mvh"
 
 
 class RepoConfig(BaseModel):
-    hosts: dict[str, HostConfig]
+    nodes: dict[str, NodeConfig]
 
 
 class DockerComposeLogLine(BaseModel):

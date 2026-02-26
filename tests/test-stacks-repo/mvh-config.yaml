@@ -1,4 +1,4 @@
-hosts:
+nodes:
   pytest:
     stacks:
       - mvh
