@@ -97,7 +97,6 @@ def _deploy_single_stack(local_repo: Path, stack: str):
     _logger.info("Processing stack %s", stack)
     assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
     os.chdir(local_repo / stack)
-    docker_compose("down")
     docker_compose("up", "--detach", "--force-recreate")
 
 
