@@ -45,21 +45,3 @@ class NodeConfig(BaseModel):
 
 class RepoConfig(BaseModel):
     nodes: dict[str, NodeConfig]
-
-
-class DockerComposeLogLine(BaseModel):
-    level: str | None = None
-    msg: str | None = None
-    id: str | None = None
-    status: str | None = None
-    text: str | None = None
-
-    def log(self):
-        if self.level and self.msg:
-            _docker_logger.log(
-                logging.getLevelNamesMapping()[self.level.upper()], self.msg
-            )
-        elif self.id and self.status:
-            _docker_logger.info("%s %s", self.id, self.status)
-        else:
-            _docker_logger.info("%s %s", self.id, self.text)

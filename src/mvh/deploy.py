@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from mvh.schema import DockerComposeLogLine, NodeConfig, AppSettings, RepoConfig
+from mvh.schema import NodeConfig, AppSettings, RepoConfig
 
 _logger = logging.getLogger(__name__)
 
