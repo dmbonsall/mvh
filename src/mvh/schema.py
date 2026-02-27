@@ -16,8 +16,8 @@ def generate_webhook_id() -> str:
 
 
 def validate_webhook_ids(val: list[str]) -> list[str]:
-    for val in val:
-        validate_webhook_id(val)
+    for webhook_id in val:
+        validate_webhook_id(webhook_id)
     return val
 
 

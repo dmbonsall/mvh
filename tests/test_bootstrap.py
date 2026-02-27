@@ -93,7 +93,7 @@ def mvh_stack_running() -> bool:
         capture_output=True,
     )
     assert result.returncode == 0
-    lines = [l for l in result.stdout.decode("utf-8").strip().split("\n") if l]
+    lines = [line for line in result.stdout.decode("utf-8").strip().split("\n") if line]
     return len(lines) == 1
 
 

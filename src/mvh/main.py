@@ -54,7 +54,9 @@ def requires_settings(
             for error in ex.errors():
                 if error["type"] == "missing":
                     console.print(
-                        "Field required:", ".".join(error["loc"]), style="bold red"
+                        "Field required:",
+                        ".".join(str(loc) for loc in error["loc"]),
+                        style="bold red",
                     )
                 else:
                     raise
