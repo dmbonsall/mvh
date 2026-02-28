@@ -16,5 +16,5 @@ repos:
     -   id: ruff
         name: ruff
         language: python
-        entry: ruff
+        entry: ruff check
         files: ^.*\.py$

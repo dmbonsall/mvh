@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from mvh.schema import NodeConfig, AppSettings, RepoConfig
+from mvh.schema import NodeConfig, AppSettings, RepoConfig, StackConfig
 
 _logger = logging.getLogger(__name__)
 
@@ -87,16 +87,18 @@ def _deploy_all_stacks_for_host(
             should_bootstrap = True
             continue
 
-        _deploy_single_stack(local_repo, stack.path)
+        _deploy_single_stack(local_repo, stack)
 
     if should_bootstrap:
         duplicate_self(settings)
 
 
-def _deploy_single_stack(local_repo: Path, stack_path: str):
-    _logger.info("Processing stack %s", stack_path)
-    assert (local_repo / stack_path).is_dir(), f"{stack_path} is not a directory"
-    os.chdir(local_repo / stack_path)
+def _deploy_single_stack(local_repo: Path, stack: StackConfig):
+    _logger.info("Processing stack %s", stack.path)
+    assert (local_repo / stack.path).is_dir(), f"{stack.path} is not a directory"
+    os.chdir(local_repo / stack.path)
+    if stack.build:
+        docker_compose("build")
     docker_compose("up", "--detach")
 
 
@@ -130,4 +132,4 @@ def bootstrap(settings: AppSettings):
             "No mvh stack found for node %s, nothing to bootstrap", settings.node
         )
         return
-    _deploy_single_stack(local_repo, mvh_stack.path)
+    _deploy_single_stack(local_repo, mvh_stack)

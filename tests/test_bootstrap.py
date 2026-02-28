@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Callable
 
 import pytest
 import requests
@@ -87,14 +88,18 @@ def stacks_repo(_stacks_repo) -> Path:
     return _stacks_repo
 
 
-def mvh_stack_running() -> bool:
+def stack_running(name: str) -> bool:
     result = subprocess.run(
-        ["docker", "ps", "--filter=name=mvh-mvh-1", "--format=json"],
+        ["docker", "ps", f"--filter=name={name}", "--format=json"],
         capture_output=True,
     )
     assert result.returncode == 0
     lines = [line for line in result.stdout.decode("utf-8").strip().split("\n") if line]
     return len(lines) == 1
+
+
+def mvh_stack_running() -> bool:
+    return stack_running("mvh-mvh-1")
 
 
 def mvh_labels() -> dict[str, str]:
@@ -108,6 +113,17 @@ def mvh_labels() -> dict[str, str]:
     data = json.loads(lines[0])
     tokens = data["Labels"].split(",")
     return {(kv := t.split("="))[0]: (kv[1] if len(kv) > 1 else None) for t in tokens}
+
+
+@pytest.fixture()
+def deploy_mvh(stacks_repo) -> Callable[[], None]:
+    def _deploy():
+        with cd(stacks_repo / "mvh"):
+            subprocess.check_call(["docker", "compose", "run", "mvh", "deploy"])
+            time.sleep(1)  # wait for mvh to start serving
+        assert mvh_stack_running()
+
+    return _deploy
 
 
 @pytest.fixture(autouse=True)
@@ -146,8 +162,39 @@ def test_webhook_with_bootstrap(stacks_repo):
         subprocess.check_call(["git", "commit", "-am", "Update labels"])
         subprocess.check_call(["git", "push", "origin", "test"])
 
-    res = requests.post("http://localhost:8000/webhook/abc123", timeout=5)
+    res = requests.post("http://localhost:8000/webhook/abc123", timeout=15)
     time.sleep(5)  # wait for the restart
     assert res.status_code == 200
     assert mvh_stack_running()
     assert mvh_labels()["test.extra"] == "EXTRA"
+
+
+def test_build_with_deploy(stacks_repo, deploy_mvh):
+    deploy_mvh()
+    assert stack_running("my-custom-my_custom_service-1")
+
+    with cd(stacks_repo / "my-custom"):
+        result = subprocess.run(
+            ["docker", "compose", "exec", "my_custom_service", "cat", "/test-file"],
+            capture_output=True,
+        )
+    assert result.returncode == 0
+    assert result.stdout.decode("utf-8").strip() == "Before changes..."
+
+    with cd(stacks_repo / "my-custom"):
+        assert (
+            Path("test-file").read_text(encoding="utf-8").strip() == "Before changes..."
+        )
+        Path("test-file").write_text("After changes...\n", encoding="utf-8")
+        subprocess.check_call(["git", "commit", "-am", "Update test-file"])
+        subprocess.check_call(["git", "push", "origin", "test"])
+
+    deploy_mvh()
+    assert stack_running("my-custom-my_custom_service-1")
+    with cd(stacks_repo / "my-custom"):
+        result = subprocess.run(
+            ["docker", "compose", "exec", "my_custom_service", "cat", "/test-file"],
+            capture_output=True,
+        )
+    assert result.returncode == 0
+    assert result.stdout.decode("utf-8").strip() == "After changes..."

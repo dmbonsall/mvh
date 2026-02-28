@@ -1,0 +1,4 @@
+services:
+  my_custom_service:
+    restart: unless-stopped
+    build: "."

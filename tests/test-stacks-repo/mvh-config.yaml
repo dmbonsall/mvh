@@ -4,3 +4,6 @@ nodes:
       - path: mvh
         is_mvh: true
         build: false
+      - path: my-custom
+        is_mvh: false
+        build: true
