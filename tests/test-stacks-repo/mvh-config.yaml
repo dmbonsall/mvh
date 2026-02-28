@@ -1,5 +1,6 @@
 nodes:
   pytest:
     stacks:
-      - mvh
-    mvh-stack: mvh
+      - path: mvh
+        is_mvh: true
+        build: false

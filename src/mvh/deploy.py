@@ -83,20 +83,20 @@ def _deploy_all_stacks_for_host(
 ):
     should_bootstrap = False
     for stack in host_config.stacks:
-        if stack == host_config.mvh_stack:
+        if stack.is_mvh:
             should_bootstrap = True
             continue
 
-        _deploy_single_stack(local_repo, stack)
+        _deploy_single_stack(local_repo, stack.path)
 
     if should_bootstrap:
         duplicate_self(settings)
 
 
-def _deploy_single_stack(local_repo: Path, stack: str):
-    _logger.info("Processing stack %s", stack)
-    assert (local_repo / stack).is_dir(), f"{stack} is not a directory"
-    os.chdir(local_repo / stack)
+def _deploy_single_stack(local_repo: Path, stack_path: str):
+    _logger.info("Processing stack %s", stack_path)
+    assert (local_repo / stack_path).is_dir(), f"{stack_path} is not a directory"
+    os.chdir(local_repo / stack_path)
     docker_compose("up", "--detach")
 
 
@@ -125,4 +125,9 @@ def deploy(settings: AppSettings):
 
 def bootstrap(settings: AppSettings):
     local_repo, repo_config = _prepare_repo(settings)
-    _deploy_single_stack(local_repo, repo_config.nodes[settings.node].mvh_stack)
+    if (mvh_stack := repo_config.nodes[settings.node].mvh_stack) is None:
+        _logger.warning(
+            "No mvh stack found for node %s, nothing to bootstrap", settings.node
+        )
+        return
+    _deploy_single_stack(local_repo, mvh_stack.path)

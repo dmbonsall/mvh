@@ -38,9 +38,21 @@ class AppSettings(BaseSettings):
     ]
 
 
+class StackConfig(BaseModel):
+    path: str
+    is_mvh: bool = False
+    build: bool = False
+
+
 class NodeConfig(BaseModel):
-    stacks: list[str]
-    mvh_stack: str = "mvh"
+    stacks: list[StackConfig]
+
+    @property
+    def mvh_stack(self) -> StackConfig | None:
+        result = list(filter(lambda x: x.is_mvh, self.stacks))
+        if not result:
+            return None
+        return result[0]
 
 
 class RepoConfig(BaseModel):
